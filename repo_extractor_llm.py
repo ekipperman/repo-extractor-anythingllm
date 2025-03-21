@@ -2,15 +2,20 @@ import os
 import requests
 from github import Github
 
-# Environment Variables
+# --- Environment Variables ---
 GITHUB_TOKEN = os.getenv("GITHUB_TOKEN")
 ANYTHINGLLM_API_KEY = os.getenv("ANYTHINGLLM_API_KEY")
 ANYTHINGLLM_URL = os.getenv("ANYTHINGLLM_URL", "https://your-anythingllm-instance.com/api")
+
+# Custom variables
 ORG_NAME = os.getenv("ORG_NAME")
 REPO_NAME = os.getenv("REPO_NAME")
+CLIENT_NAME = os.getenv("CLIENT_NAME", "default-client")  # Dynamic client name
+WORKSPACE_TAGS = os.getenv("WORKSPACE_TAGS", "automation,extraction")  # Comma-separated tags
 
 # Validate env vars
-if not all([GITHUB_TOKEN, ANYTHINGLLM_API_KEY, ANYTHINGLLM_URL, ORG_NAME, REPO_NAME]):
+required_vars = [GITHUB_TOKEN, ANYTHINGLLM_API_KEY, ANYTHINGLLM_URL, ORG_NAME, REPO_NAME]
+if not all(required_vars):
     raise Exception("🚨 One or more required environment variables are missing!")
 
 # Initialize GitHub API
@@ -34,20 +39,29 @@ def fetch_repo_files(path=""):
     return extracted_data
 
 def create_workspace():
-    """Create a new workspace in AnythingLLM."""
+    """Create a new workspace in AnythingLLM with dynamic naming and tags."""
     headers = {
         "Authorization": f"Bearer {ANYTHINGLLM_API_KEY}",
         "Content-Type": "application/json"
     }
+
+    # Dynamically name workspace with client name
+    workspace_name = f"{CLIENT_NAME}-{REPO_NAME}"
+
+    # Convert tags string into a list
+    tags_list = [tag.strip() for tag in WORKSPACE_TAGS.split(",")]
+
     data = {
-        "name": REPO_NAME
+        "name": workspace_name,
+        "tags": tags_list,  # Pass tags to AnythingLLM
+        "description": f"Workspace for {CLIENT_NAME}'s repository {REPO_NAME}"
     }
 
     response = requests.post(f"{ANYTHINGLLM_URL}/workspaces", headers=headers, json=data)
-    
+
     if response.status_code == 200:
         workspace = response.json()
-        print(f"✅ Workspace '{REPO_NAME}' created! ID: {workspace.get('id')}")
+        print(f"✅ Workspace '{workspace_name}' created! ID: {workspace.get('id')}")
         return workspace.get("id")
     else:
         raise Exception(f"❌ Workspace creation failed: {response.status_code}, {response.text}")
@@ -79,9 +93,9 @@ def upload_documents(workspace_id, extracted_data):
 def trigger_ai_training(workspace_id):
     """Trigger AI Agent Training after data upload."""
     headers = {"Authorization": f"Bearer {ANYTHINGLLM_API_KEY}"}
-    
+
     response = requests.post(f"{ANYTHINGLLM_URL}/workspaces/{workspace_id}/train", headers=headers)
-    
+
     if response.status_code == 200:
         print("✅ AI Training Successfully Triggered!")
     else:
@@ -90,18 +104,18 @@ def trigger_ai_training(workspace_id):
 def main():
     print("🚀 Starting Automated Workspace Creation and Repo Extraction...")
     
-    # Step 1: Create Workspace
+    # Step 1: Create Workspace (Dynamic)
     workspace_id = create_workspace()
-    
+
     # Step 2: Fetch repo data
     repo_data = fetch_repo_files()
     if not repo_data:
         print("⚠️ No files matched the target filters.")
         return
-    
+
     # Step 3: Upload files to AnythingLLM Workspace
     upload_documents(workspace_id, repo_data)
-    
+
     # Step 4: Trigger AI Training
     trigger_ai_training(workspace_id)
 
