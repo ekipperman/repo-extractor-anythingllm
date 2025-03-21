@@ -33,47 +33,78 @@ def fetch_repo_files(path=""):
 
     return extracted_data
 
-def format_data_for_anythingllm(extracted_data):
-    """Format extracted data into AnythingLLM-compatible JSON."""
-    return {
-        "workspace_name": REPO_NAME,
-        "documents": [
-            {"name": path, "content": content} for path, content in extracted_data.items()
-        ]
-    }
-
-def upload_to_anythingllm(formatted_data):
-    """Upload extracted & formatted data to AnythingLLM API."""
+def create_workspace():
+    """Create a new workspace in AnythingLLM."""
     headers = {
         "Authorization": f"Bearer {ANYTHINGLLM_API_KEY}",
         "Content-Type": "application/json"
     }
-    response = requests.post(f"{ANYTHINGLLM_URL}/upload", headers=headers, json=formatted_data)
+    data = {
+        "name": REPO_NAME
+    }
 
+    response = requests.post(f"{ANYTHINGLLM_URL}/workspaces", headers=headers, json=data)
+    
     if response.status_code == 200:
-        print("✅ Successfully uploaded data to AnythingLLM!")
+        workspace = response.json()
+        print(f"✅ Workspace '{REPO_NAME}' created! ID: {workspace.get('id')}")
+        return workspace.get("id")
     else:
-        print(f"❌ Upload failed: {response.status_code}, {response.text}")
+        raise Exception(f"❌ Workspace creation failed: {response.status_code}, {response.text}")
 
-def trigger_ai_training():
+def upload_documents(workspace_id, extracted_data):
+    """Upload extracted files to the new workspace."""
+    headers = {
+        "Authorization": f"Bearer {ANYTHINGLLM_API_KEY}",
+        "Content-Type": "application/json"
+    }
+
+    for path, content in extracted_data.items():
+        doc_payload = {
+            "name": path,
+            "content": content
+        }
+
+        response = requests.post(
+            f"{ANYTHINGLLM_URL}/workspaces/{workspace_id}/documents",
+            headers=headers,
+            json=doc_payload
+        )
+
+        if response.status_code == 200:
+            print(f"✅ Uploaded {path} to workspace!")
+        else:
+            print(f"❌ Failed to upload {path}: {response.status_code}, {response.text}")
+
+def trigger_ai_training(workspace_id):
     """Trigger AI Agent Training after data upload."""
     headers = {"Authorization": f"Bearer {ANYTHINGLLM_API_KEY}"}
-    response = requests.post(f"{ANYTHINGLLM_URL}/train", headers=headers)
-
+    
+    response = requests.post(f"{ANYTHINGLLM_URL}/workspaces/{workspace_id}/train", headers=headers)
+    
     if response.status_code == 200:
         print("✅ AI Training Successfully Triggered!")
     else:
         print(f"❌ AI Training failed: {response.status_code}, {response.text}")
 
 def main():
-    print("🚀 Starting Repo Extraction & LLM Integration...")
+    print("🚀 Starting Automated Workspace Creation and Repo Extraction...")
+    
+    # Step 1: Create Workspace
+    workspace_id = create_workspace()
+    
+    # Step 2: Fetch repo data
     repo_data = fetch_repo_files()
     if not repo_data:
         print("⚠️ No files matched the target filters.")
         return
-    formatted_data = format_data_for_anythingllm(repo_data)
-    upload_to_anythingllm(formatted_data)
-    trigger_ai_training()
+    
+    # Step 3: Upload files to AnythingLLM Workspace
+    upload_documents(workspace_id, repo_data)
+    
+    # Step 4: Trigger AI Training
+    trigger_ai_training(workspace_id)
+
     print("✅ Process Completed!")
 
 if __name__ == "__main__":
