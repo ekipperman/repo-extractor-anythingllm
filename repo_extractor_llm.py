@@ -1,19 +1,21 @@
 import os
-import requests
-from github import Github
 from dotenv import load_dotenv
 
-# Load environment variables from .env
-load_dotenv()
+load_dotenv()  # make sure this is here!
 
-# Fetch environment variables
+# Environment Variables
 GITHUB_TOKEN = os.getenv("GITHUB_TOKEN")
 ANYTHINGLLM_API_KEY = os.getenv("ANYTHINGLLM_API_KEY")
 ANYTHINGLLM_URL = os.getenv("ANYTHINGLLM_URL", "https://your-anythingllm-instance.com/api")
+
+# Custom variables
 ORG_NAME = os.getenv("ORG_NAME")
 REPO_NAME = os.getenv("REPO_NAME")
-CLIENT_NAME = os.getenv("CLIENT_NAME", "default-client")
-WORKSPACE_TAGS = os.getenv("WORKSPACE_TAGS", "automation,extraction")
+
+# Debug: Print to confirm
+print("GITHUB_TOKEN:", "SET" if GITHUB_TOKEN else "MISSING")
+print("ORG_NAME:", ORG_NAME)
+print("REPO_NAME:", REPO_NAME)
 
 # Validate environment variables
 required_vars = [GITHUB_TOKEN, ANYTHINGLLM_API_KEY, ANYTHINGLLM_URL, ORG_NAME, REPO_NAME]
