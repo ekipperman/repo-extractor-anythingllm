@@ -17,7 +17,7 @@ REPO_NAME = os.getenv("REPO_NAME")
 CLIENT_NAME = os.getenv("CLIENT_NAME", "default-client")  # Optional, fallback
 WORKSPACE_TAGS = os.getenv("WORKSPACE_TAGS", "automation,extraction")  # Comma-separated string
 
-# ✅ Debug Prints to Confirm
+# ✅ Debug Prints to Confirm ENV Variables
 print("------------ ENVIRONMENT VARIABLES ------------")
 print(f"GITHUB_TOKEN: {'SET ✅' if GITHUB_TOKEN else '❌ MISSING'}")
 print(f"ANYTHINGLLM_API_KEY: {'SET ✅' if ANYTHINGLLM_API_KEY else '❌ MISSING'}")
@@ -35,10 +35,9 @@ if not all(required_vars):
 
 # ✅ Initialize GitHub API and Get Repo
 github = Github(GITHUB_TOKEN)
-
 repo_path = f"{ORG_NAME}/{REPO_NAME}"
-print(f"🔍 Trying to get repo: {repo_path}")
 
+print(f"🔍 Trying to get repo: {repo_path}")
 try:
     repo = github.get_repo(repo_path)
     print(f"✅ Connected to repository: {repo.full_name}")
@@ -69,8 +68,11 @@ def fetch_repo_files(path=".", depth=0):
 
 def create_workspace():
     """Create a workspace in AnythingLLM."""
-    url = f"{ANYTHINGLLM_URL}/workspaces"
-    headers = {"Authorization": f"Bearer {ANYTHINGLLM_API_KEY}"}
+    url = f"{ANYTHINGLLM_URL}/api/workspaces"  # ✅ Ensure '/api' is in the URL
+    headers = {
+        "Authorization": f"Bearer {ANYTHINGLLM_API_KEY}",
+        "Content-Type": "application/json"
+    }
     data = {
         "name": CLIENT_NAME,
         "tags": WORKSPACE_TAGS.split(",")
@@ -79,26 +81,64 @@ def create_workspace():
     print(f"🔧 Creating workspace '{CLIENT_NAME}' at {url}...")
     response = requests.post(url, headers=headers, json=data)
 
+    print(f"Response Status Code: {response.status_code}")
+    print(f"Response Text: {response.text}")
+
     if response.status_code == 200:
-        workspace = response.json()
-        print(f"✅ Workspace '{CLIENT_NAME}' created! Workspace ID: {workspace['id']}")
-        return workspace['id']
+        try:
+            workspace = response.json()
+            print(f"✅ Workspace '{CLIENT_NAME}' created! Workspace ID: {workspace['id']}")
+            return workspace['id']
+        except Exception as e:
+            print(f"❌ JSON Decode Error: {e}")
+            return None
     elif response.status_code == 409:
-        print(f"⚠️ Workspace '{CLIENT_NAME}' already exists. Skipping creation.")
-        # You may want to fetch the existing workspace ID here in a real scenario
-        return None
+        print(f"⚠️ Workspace '{CLIENT_NAME}' already exists. Attempting to retrieve existing workspace ID...")
+        return fetch_existing_workspace_id(CLIENT_NAME)
     else:
         print(f"❌ Failed to create workspace: {response.status_code} {response.text}")
         return None
 
+def fetch_existing_workspace_id(workspace_name):
+    """Fetch the ID of an existing workspace by name."""
+    url = f"{ANYTHINGLLM_URL}/api/workspaces"
+    headers = {
+        "Authorization": f"Bearer {ANYTHINGLLM_API_KEY}",
+        "Content-Type": "application/json"
+    }
+
+    print(f"🔎 Searching for workspace '{workspace_name}' at {url}...")
+    response = requests.get(url, headers=headers)
+
+    if response.status_code == 200:
+        try:
+            workspaces = response.json()
+            for ws in workspaces:
+                if ws['name'] == workspace_name:
+                    print(f"✅ Found workspace '{workspace_name}' with ID: {ws['id']}")
+                    return ws['id']
+            print(f"❌ Workspace '{workspace_name}' not found.")
+        except Exception as e:
+            print(f"❌ JSON Decode Error: {e}")
+    else:
+        print(f"❌ Failed to fetch workspaces: {response.status_code} {response.text}")
+    return None
+
 def upload_to_anythingllm(workspace_id, extracted_data):
     """Upload extracted data to AnythingLLM."""
-    url = f"{ANYTHINGLLM_URL}/workspaces/{workspace_id}/documents"
-    headers = {"Authorization": f"Bearer {ANYTHINGLLM_API_KEY}"}
+    url = f"{ANYTHINGLLM_URL}/api/workspaces/{workspace_id}/documents"
+    headers = {
+        "Authorization": f"Bearer {ANYTHINGLLM_API_KEY}",
+        "Content-Type": "application/json"
+    }
+
     documents = [{"name": path, "content": content} for path, content in extracted_data.items()]
 
     print(f"📤 Uploading {len(documents)} documents to workspace ID {workspace_id}...")
     response = requests.post(url, headers=headers, json={"documents": documents})
+
+    print(f"Response Status Code: {response.status_code}")
+    print(f"Response Text: {response.text}")
 
     if response.status_code == 200:
         print("✅ Successfully uploaded documents to AnythingLLM!")
@@ -107,11 +147,17 @@ def upload_to_anythingllm(workspace_id, extracted_data):
 
 def trigger_ai_training(workspace_id):
     """Trigger AI Agent Training in AnythingLLM."""
-    url = f"{ANYTHINGLLM_URL}/workspaces/{workspace_id}/train"
-    headers = {"Authorization": f"Bearer {ANYTHINGLLM_API_KEY}"}
+    url = f"{ANYTHINGLLM_URL}/api/workspaces/{workspace_id}/train"
+    headers = {
+        "Authorization": f"Bearer {ANYTHINGLLM_API_KEY}",
+        "Content-Type": "application/json"
+    }
 
     print(f"🚀 Triggering AI training on workspace ID {workspace_id}...")
     response = requests.post(url, headers=headers)
+
+    print(f"Response Status Code: {response.status_code}")
+    print(f"Response Text: {response.text}")
 
     if response.status_code == 200:
         print("✅ AI Training successfully triggered!")
@@ -121,10 +167,10 @@ def trigger_ai_training(workspace_id):
 def main():
     print("🚀 Starting Repo Extraction and AnythingLLM Integration...")
 
-    # Step 1: Create a workspace
+    # Step 1: Create or fetch workspace
     workspace_id = create_workspace()
     if not workspace_id:
-        print("❌ Workspace creation failed or already exists. Aborting.")
+        print("❌ Workspace creation failed or already exists but could not retrieve ID. Aborting.")
         return
 
     # Step 2: Fetch repo data
