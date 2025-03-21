@@ -111,3 +111,14 @@ def main():
 
 if __name__ == "__main__":
     main()
+print(f"ORG_NAME: {ORG_NAME}")
+print(f"REPO_NAME: {REPO_NAME}")
+
+github = Github(GITHUB_TOKEN)
+
+repo_path = f"{ORG_NAME}/{REPO_NAME}"
+print(f"Trying to get repo: {repo_path}")
+
+repo = github.get_repo(repo_path)
+
+print(f"✅ Repo found: {repo.full_name}")
