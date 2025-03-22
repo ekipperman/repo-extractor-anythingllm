@@ -12,7 +12,7 @@ app.use(cors());
 app.use(express.json());
 
 // ✅ ENV Variables (From Railway or .env)
-const ANYTHINGLLM_URL = process.env.ANYTHINGLLM_URL;         // e.g. https://anythingllm-backend-production.up.railway.app/api
+const ANYTHINGLLM_URL = process.env.ANYTHINGLLM_URL;         // e.g. https://anythingllm-backend-production.up.railway.app/
 const ANYTHINGLLM_API_KEY = process.env.ANYTHINGLLM_API_KEY; // Your AnythingLLM API Key
 
 // ✅ Debug the ENV (Optional for Testing)
